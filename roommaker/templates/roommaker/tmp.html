@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Chat</title>
+</head>
+
+<body>
+
+メッセージ：<input type="text" id="input-message" name="message" value="">
+<button id="btn-submit">送る</button>
+
+<br>
+
+<!--田中くんのところ -->
+
+<a>Mothman Presen Viewer</a>
+<div>
+  <!--
+  <button id="prev" onclick="onPrevPage()">Previous</button>
+  <button id="next" onclick="onNextPage()">Next</button>
+  -->
+  <button id="prev">Previous</button>
+  <button id="next">Next</button>
+  &nbsp; &nbsp;
+  <span>Page: <span id="page_num"></span> / <span id="page_count"></span></span>
+</div>
+
+<div>
+<input type="text" name="txtb" id="textid" value="https://gojiteji.github.io/pdfshow.github.io/sample.pdf" placeholder="https://□□□/〇〇.pdf"　>
+<button id="presen">Start Presentation</button>
+</div>
+
+
+<div>
+<input type="text" name="txtb" id="pagenum" value="4" placeholder=""　>
+<button id="pagejump" onclick="onJumpPage()">Jump Page</button>
+</div>
+
+
+
+<canvas id="the-canvas"></canvas>
+
+<!-- ここまで -->
+<br>
+届いたメッセージ<div id="area-message"> </div>
+
+</body>
+
+<script src="https://gojiteji.github.io/pdfshow.github.io/build/pdf.js"></script>
+
+
+<script src="https://gojiteji.github.io/pdfshow.github.io/sample.js"></script>
+
+
+
+<!--ここにFirebaseのコード-->
+
+<script src="https://www.gstatic.com/firebasejs/5.2.0/firebase.js"></script>
+<script>
+  // Initialize Firebase
+  var config = {
+    apiKey: "AIzaSyBZ12XksaeffEzA1jq_f4f1HveSlGjoKPE",
+    authDomain: "sample-1caf1.firebaseapp.com",
+    databaseURL: "https://sample-1caf1.firebaseio.com",
+    projectId: "sample-1caf1",
+    storageBucket: "sample-1caf1.appspot.com",
+    messagingSenderId: "69278405251"
+  };
+  firebase.initializeApp(config);
+</script>
+
+<!--
+<script src="js/jquery-3.3.1.min.js"></script>
+<script src="js/script.js"></script>
+-->
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+
+
+<script>
+
+  //http~ のテンプレートurl　使用によって変わるところ
+  var baseurl = "http://127.0.0.1:8000/room/";
+
+  var url = location.href;
+
+  //テンプレート文字からの先の文字列を取得
+  var str = url.replace(baseurl,"");
+
+  //送信先のデータベース
+  var sendname = str;
+
+  $(document).ready(function () {
+
+    //ユーザ情報の変数
+    var __User = {};
+
+    //匿名でユーザ認証を行う
+    firebase.auth().signInAnonymously().catch(function (error) {
+        var errorCode = error.code;
+        var errorMessage = error.message;
+    });
+
+    //ユーザ情報を取得する
+    firebase.auth().onAuthStateChanged(function (user) {
+        if (user) { //User情報が取得できた場合
+            __User.isAnonymous = user.isAnonymous;
+            __User.uid = user.uid;
+
+        } else { //ログアウト時
+
+        }
+    });
+
+    var input_message = $("#input-message");
+    var btn_submit = $("#btn-submit");
+
+
+    //[送る]ボタンを押したときのイベント設定
+    btn_submit.on("click", function () {
+        //テキストボックスに入力されているデータを取得
+        var message_data = input_message.val();
+
+        //入力されているデータがある場合送る
+        if (message_data.length > 0) {
+            sendMessage(__User.uid, message_data);
+        }
+    });
+
+
+    function sendMessage(uid, message) {
+
+        //送りたいデータ
+        var data = {
+            "uid": uid,//ユーザID
+            "message": message//メッセージ
+        };
+
+        //新しいIDを取得します
+        var newMessageKey = firebase.database().ref().child(sendname).push().key;
+
+        //messagesにデータを保存します
+        return firebase.database().ref("/rooms/" + sendname + "/messages/" + newMessageKey).update(data).then(
+            //送信成功時の処理
+            function () {
+                console.log("メッセージを送信しました。");
+            },
+            //送信失敗時の処理
+            function (error) {
+                console.log("送信に失敗しました");
+            }
+        );
+    }
+
+    var btn_next = $("#next");
+    var btn_prev = $("#prev");
+
+    //[next]ボタンを押したときのイベント設定
+    btn_next.on("click", function () {
+        sendpdf(true);
+    });
+
+    //[prev]ボタンを押したときのイベント設定
+    btn_prev.on("click", function () {
+        sendpdf(false);
+    });
+
+    var btn_jump = $("#pagejump");//pagejumpボタン
+    var input_page_num = $("#pagenum");//飛びたいページ数の指定
+
+    btn_jump.on("click", function (){
+        var jump_num = input_page_num.val();
+        if(!isNaN(jump_num)){
+            sendpdf(true, jump_num);
+        }
+    });
+
+
+    //プレゼンテーションの遷移イベント
+    function sendpdf(nextorder, jump_num = -1) {
+
+        var order;
+        if(jump_num != -1){
+          order = String(jump_num);
+        }
+        else{
+          if(nextorder){
+            order = "next";
+          }
+          else{
+            order = "prev";
+          }
+        }
+
+        //送りたいデータ
+        var data = {
+            "order": order//メッセージ
+        };
+
+        //新しいIDを取得します
+        var newMessageKey = firebase.database().ref().child(sendname).push().key;
+
+        //messagesにデータを保存します
+        return firebase.database().ref("/rooms/" + sendname + "/presen_order/" + newMessageKey).update(data).then(
+            //送信成功時の処理
+            function () {
+                console.log("メッセージを送信しました。");
+            },
+            //送信失敗時の処理
+            function (error) {
+                console.log("送信に失敗しました");
+            }
+        );
+    }
+
+  });
+
+  //メッセージを表示するエリア
+  var message_area = $("#area-message");
+
+  //データベースに変更があった場合変更分を表示エリアに描画する
+  firebase.database().ref('/rooms/' + sendname + "/messages/" ).on('child_added', function(snapshot) {
+    var data = snapshot.val();
+    message_area.append('<p>' + data['message'] + '</p>');
+  });
+
+  //データベースに変更があった場合変更分をスライドに反映する。
+  firebase.database().ref('/rooms/' + sendname + "/presen_order/" ).on('child_added', function(snapshot) {
+    var data = snapshot.val();
+    if(data['order'] == "next"){
+      onNextPage();
+    }
+    else if(data['order'] == "prev"){
+      onPrevPage();
+    }
+    else{
+      var page_num = Number(data['order']);
+      onJumpPage(page_num);
+    }
+  });
+</script>
+
+</html>

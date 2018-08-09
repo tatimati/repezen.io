@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Chat</title>
+</head>
+
+<body>
+<button class="authBtn" disabled></button> <br>
+<span class="userId"></span>さんこんにちは!
+お部屋の名前：<input type="text" id="input-message" name="message" value=""><br>
+pdfのurl：<input type="text" id="input-pdf" name="pdfurl" value="">
+<button id="btn-submit">作る</button>
+
+</body>
+
+<!--ここにFirebaseのコード-->
+
+<script src="https://www.gstatic.com/firebasejs/5.2.0/firebase.js"></script>
+<script>
+  // Initialize Firebase
+  var config = {
+    apiKey: "AIzaSyBZ12XksaeffEzA1jq_f4f1HveSlGjoKPE",
+    authDomain: "sample-1caf1.firebaseapp.com",
+    databaseURL: "https://sample-1caf1.firebaseio.com",
+    projectId: "sample-1caf1",
+    storageBucket: "sample-1caf1.appspot.com",
+    messagingSenderId: "69278405251"
+  };
+  firebase.initializeApp(config);
+</script>
+
+<!--
+<script src="js/jquery-3.3.1.min.js"></script>
+<script src="js/script.js"></script>
+-->
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+
+
+<script>
+
+  var sendname = "yahoo";
+
+  //http~ のテンプレートurl　使用によって変わるところ
+  var baseurl = "http://127.0.0.1:8000/room/";
+
+  //認証
+
+  var AuthUI = {
+    init: function(){
+      AuthUI.provider = new firebase.auth.GoogleAuthProvider();
+      AuthUI.elAuthBtn = document.querySelector('.authBtn');
+      AuthUI.elUserId = document.querySelector('.userId');
+      AuthUI.draw();
+      AuthUI.elAuthBtn.addEventListener('click', function(){
+        AuthUI.doAuth();
+      });
+      firebase.auth().getRedirectResult().then(function(result) {
+        AuthUI.elAuthBtn.disabled = false;
+        if (result.credential) {
+          // This gives you a Google Access Token. You can use it to access the Google API.
+          var token = result.credential.accessToken;
+        }
+        if(result.user){
+          AuthUI.data.authed = true;
+          AuthUI.data.userId = result.user.email;
+          AuthUI.draw();
+        }
+      }).catch(function(error) {
+        // Handle Errors here.
+        var errorCode = error.code;
+        var errorMessage = error.message;
+        // The email of the user's account used.
+        var email = error.email;
+        // The firebase.auth.AuthCredential type that was used.
+        var credential = error.credential;
+        // ...
+      });
+    },
+    data: {
+      authed: false,
+      userId: '',
+      info: ''
+    },
+    draw: function(){
+      AuthUI.elAuthBtn.textContent = AuthUI.data.authed ? 'LOGOUT' : 'LOGIN';
+      AuthUI.elUserId.textContent = AuthUI.data.userId;
+    },
+    doAuth: function(){
+      if(AuthUI.data.authed){
+        firebase.auth().signOut().then(function() {
+          AuthUI.data.authed = false;
+          AuthUI.data.userId = '';
+          AuthUI.draw();
+        }, function(error) {
+          // An error happened.
+        });
+      }
+      else {
+        firebase.auth().signInWithRedirect(AuthUI.provider);
+      }
+    }
+  };
+
+  AuthUI.init();
+
+  $(document).ready(function () {
+
+    //ユーザ情報の変数
+    var __User = {};
+
+    /*
+    var provider = new firebase.auth.GoogleAuthProvider();
+
+    firebase.auth().getRedirectResult().then(function(result) {
+      if (result.credential) {
+        // This gives you a Google Access Token. You can use it to access the Google API.
+        var token = result.credential.accessToken;
+        // ...
+      }
+      // The signed-in user info.
+      var user = result.user;
+    }).catch(function(error) {
+      // Handle Errors here.
+      var errorCode = error.code;
+      var errorMessage = error.message;
+      // The email of the user's account used.
+      var email = error.email;
+      // The firebase.auth.AuthCredential type that was used.
+      var credential = error.credential;
+      // ...
+    });
+    */
+    /*
+
+    //匿名でユーザ認証を行う
+    firebase.auth().signInAnonymously().catch(function (error) {
+        var errorCode = error.code;
+        var errorMessage = error.message;
+    });
+
+    */
+
+    /*
+    //ユーザ情報を取得する
+    firebase.auth().onAuthStateChanged(function (user) {
+        if (user) { //User情報が取得できた場合
+            __User.isAnonymous = user.isAnonymous;
+            __User.uid = user.uid;
+
+        } else { //ログアウト時
+
+        }
+    });
+    */
+
+    var input_message = $("#input-message");
+    var input_pdf = $("#input-pdf");
+    var btn_submit = $("#btn-submit");
+
+
+    //[送る]ボタンを押したときのイベント設定
+    btn_submit.on("click", function () {
+      //テキストボックスに入力されているデータを取得
+      var message_data = input_message.val();
+      var pdfurl_data = input_pdf.val();
+      sendname = message_data;
+
+      //入力されているデータがある場合送る
+      if (message_data.length > 0 && pdfurl_data.length > 0) {
+          sendMessage(__User.uid, message_data, pdfurl_data);
+      }
+      else{
+        alert("input is not written!");
+      }
+
+    });
+
+
+    function sendMessage(userid, message, pdfurl) {
+
+        if(AuthUI.data.userId == ""){
+          alert("Please Login!");
+          return;
+        }
+
+        var roomname = sendname;
+
+        first_message = "HelloWorld";
+
+        userid = AuthUI.data.userId;
+
+        //送りたいデータ
+        var data = {
+            "userid": userid,//ユーザID
+            "message": first_message,//メッセージ
+            "name" : roomname,
+            "pdfurl" : pdfurl
+        };
+
+        //新しいIDを取得します
+        var newMessageKey = firebase.database().ref().child(sendname).push().key;
+
+        //messagesにデータを保存します
+        return firebase.database().ref("/rooms/" + sendname + '/' + newMessageKey).update(data).then(
+            //送信成功時の処理
+            function () {
+                //ここでurlの通知
+                var urlmakename = sendname;
+                alert(baseurl + urlmakename);
+                console.log("メッセージを送信しました。");
+            },
+            //送信失敗時の処理
+            function (error) {
+                console.log("送信に失敗しました");
+            }
+        );
+    }
+  });
+
+</script>
+
+</html>
