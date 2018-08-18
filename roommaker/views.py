@@ -7,8 +7,12 @@ def maker(request):
 
 def comment(request):
 
-    return render(request, 'roommaker/basepresen.html', {})
+    return render(request, 'roommaker/tmp.html', {})
 
 def test(request):
 
     return render(request, 'roommaker/test.html', {})
+
+def option(request):
+
+    return render(request, 'roommaker/option.html', {})

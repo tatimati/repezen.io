@@ -1,50 +1,62 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <title>Simple Chat</title>
-</head>
+  <head>
+      <title>Simple Chat</title>
+  </head>
 
-<body>
+  <body>
 
-メッセージ：<input type="text" id="input-message" name="message" value="">
-<button id="btn-submit">送る</button>
+    <div>
+      <button class="authBtn" disabled></button> <br>
+      <span class="userId"></span>さんこんにちは!
+    </div>
 
-<br>
+    <maina id = "maina">
+      メッセージ：<input type="text" id="input-message" name="message" value="">
+      <button id="btn-submit">送る</button>
 
-<!--田中くんのところ -->
+      <br>
 
-<a>Mothman Presen Viewer</a>
-<div>
-  <!--
-  <button id="prev" onclick="onPrevPage()">Previous</button>
-  <button id="next" onclick="onNextPage()">Next</button>
-  -->
-  <button id="prev">Previous</button>
-  <button id="next">Next</button>
-  &nbsp; &nbsp;
-  <span>Page: <span id="page_num"></span> / <span id="page_count"></span></span>
-</div>
+      <!--田中くんのところ -->
 
-<div>
-<input type="text" name="txtb" id="textid" value="https://gojiteji.github.io/pdfshow.github.io/sample.pdf" placeholder="https://□□□/〇〇.pdf"　>
-<button id="presen">Start Presentation</button>
-</div>
+      <a>Mothman Presen Viewer</a>
+      <div>
+        <button id="prev">Previous</button>
+        <button id="next">Next</button>
+        &nbsp; &nbsp;
+        <span>Page: <span id="page_num"></span> / <span id="page_count"></span></span>
+      </div>
 
-
-<div>
-<input type="text" name="txtb" id="pagenum" value="4" placeholder=""　>
-<button id="pagejump" onclick="onJumpPage()">Jump Page</button>
-</div>
+      <div>
+      <input type="text" name="txtb" id="textid" value="https://gojiteji.github.io/pdfshow.github.io/sample.pdf" placeholder="https://□□□/〇〇.pdf"　>
+      <button id="presen">Start Presentation</button>
+      </div>
 
 
+      <div>
+      <input type="text" name="txtb" id="pagenum" value="4" placeholder=""　>
+      <button id="pagejump" onclick="onJumpPage()">Jump Page</button>
+      </div>
 
-<canvas id="the-canvas"></canvas>
 
-<!-- ここまで -->
-<br>
-届いたメッセージ<div id="area-message"> </div>
 
-</body>
+      <canvas id="the-canvas"></canvas>
+
+      <!-- ここまで -->
+      <br>
+      届いたメッセージ<div id="area-message"> </div>
+
+    </maina>
+
+  </body>
+
+
+
+  <style>
+    maina {
+     display: none;
+    }
+  </style>
 
 <script src="https://gojiteji.github.io/pdfshow.github.io/build/pdf.js"></script>
 
@@ -78,6 +90,88 @@
 
 <script>
 
+  //認証
+
+  var AuthUI = {
+    init: function(){
+      AuthUI.provider = new firebase.auth.GoogleAuthProvider();
+      AuthUI.elAuthBtn = document.querySelector('.authBtn');
+      AuthUI.elUserId = document.querySelector('.userId');
+      AuthUI.draw();
+      AuthUI.elAuthBtn.addEventListener('click', function(){
+        AuthUI.doAuth();
+      });
+      firebase.auth().getRedirectResult().then(function(result) {
+        AuthUI.elAuthBtn.disabled = false;
+        if (result.credential) {
+          // This gives you a Google Access Token. You can use it to access the Google API.
+          var token = result.credential.accessToken;
+        }
+        if(result.user){
+          AuthUI.data.authed = true;
+          AuthUI.data.userId = result.user.email;
+          AuthUI.draw();
+        }
+      }).catch(function(error) {
+        // Handle Errors here.
+        var errorCode = error.code;
+        var errorMessage = error.message;
+        // The email of the user's account used.
+        var email = error.email;
+        // The firebase.auth.AuthCredential type that was used.
+        var credential = error.credential;
+        // ...
+      });
+    },
+    data: {
+      authed: false,
+      userId: '',
+      info: ''
+    },
+    draw: function(){
+      //これでログインしているかどうかを確認できる。
+      user = firebase.auth().currentUser;
+      if (user && user.displayName != null) {
+        $("#message").show();
+        $("#input-message").show();
+        $("#btn-submit").show();
+        AuthUI.elAuthBtn.textContent = "LOGOUT";
+        //alert(user.displayName);
+        AuthUI.elUserId.textContent = user.email;
+        // User is signed in.
+      } else {
+        $("#message").hide();
+        $("#input-message").hide();
+        $("#btn-submit").hide();
+        AuthUI.elAuthBtn.textContent = "LOGIN";
+        AuthUI.elUserId.textContent = "";
+        // No user is signed in.
+      }
+
+    },
+    doAuth: function(){
+      user = firebase.auth().currentUser;
+      if (user) {
+        firebase.auth().signOut().then(function() {
+          AuthUI.data.authed = false;
+          AuthUI.data.userId = '';
+          AuthUI.draw();
+          document.getElementById('maina').style.display = "none";
+          // Sign-out successful.
+        }).catch(function(error) {
+          // An error happened.
+        });
+        // User is signed in.
+      } else {
+        firebase.auth().signInWithRedirect(AuthUI.provider);
+        // No user is signed in.
+      }
+
+    },
+  };
+
+  AuthUI.init();
+
   //http~ のテンプレートurl　使用によって変わるところ
   var baseurl = "http://127.0.0.1:8000/room/";
 
@@ -88,6 +182,46 @@
 
   //送信先のデータベース
   var sendname = str;
+
+  var flag = false;
+
+  //データベースに一回だけアクセスする
+  firebase.database().ref('/rooms/' + sendname + "/AllowedAccounts/" ).once('value').then(function(snapshot) {
+    var data = snapshot.val();
+
+    var user = firebase.auth().currentUser;
+    var loginflag = true;
+    if (user) {
+      if(user.email == null){
+        //AuthUI.doAuth();
+        loginflag = false;
+      }
+      // User is signed in.
+    } else {
+      alert("Didn't login!");
+      loginflag = false;
+      //ログインの確認は少し時間がかかる
+      //AuthUI.doAuth();
+      // No user is signed in.
+    }
+    if(loginflag){
+      for(var pro in data){
+        //これでAllowedAccountsの子供にあるメールアドレスを取得できる。
+        //console.log(data[pro]["message"]);
+        if(user.email == data[pro]["message"]){
+          flag = true;
+          break;
+        }
+      }
+      if(!flag){
+        alert("You are not allowed!");
+      }
+      else{
+        document.getElementById('maina').style.display = "block";
+        alert("Yatta Yatta");
+      }
+    }
+  });
 
   $(document).ready(function () {
 

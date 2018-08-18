@@ -7,9 +7,9 @@
 <body>
 <button class="authBtn" disabled></button> <br>
 <span class="userId"></span>さんこんにちは!
-お部屋の名前：<input type="text" id="input-message" name="message" value=""><br>
-pdfのurl：<input type="text" id="input-pdf" name="pdfurl" value="">
-<button id="btn-submit">作る</button>
+<p id = "message">許可するgoogleアカウント名:</p>
+<input type="text" id="input-message" name="message" value="">
+<button id="btn-submit">送信</button>
 
 </body>
 
@@ -35,13 +35,55 @@ pdfのurl：<input type="text" id="input-pdf" name="pdfurl" value="">
 -->
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
 
+<!--初期化-->
+<script>
+$("#message").hide();
+$("#input-message").hide();
+$("#btn-submit").hide();
+</script>
 
 <script>
 
   var sendname = "yahoo";
 
   //http~ のテンプレートurl　使用によって変わるところ
-  var baseurl = "http://127.0.0.1:8000/room/";
+  var baseurl = "http://127.0.0.1:8000/option/";
+
+  var url = location.href;
+
+  //テンプレート文字からの先の文字列を取得
+  var str = url.replace(baseurl,"");
+
+  //送信先のデータベース
+  var sendname = str;
+
+  var mastername = "-1undefinder";
+
+  //ログインしている人と作成者が一致しているかのフラグ
+  var flag = false;
+
+  //データベースに一回だけアクセスする
+  firebase.database().ref('/rooms/' + sendname + "/information/" ).once('value').then(function(snapshot) {
+    var data = snapshot.val();
+    mastername = data["userid"];
+
+    //こっちで呼ばないと遅い
+    //こっちじゃないとmasternameが取得できているかどうかが確認できない。
+    firebase.auth().onAuthStateChanged(function(user) {
+      if (user) {
+        //alert("ok");
+        if(user.email == mastername){
+
+          flag = true;
+        }
+        // User is signed in.
+      } else {
+        // No user is signed in.
+      }
+    });
+    //alert("u: " + mastername);
+    //alert(AuthUI.userId);
+  });
 
   //認証
 
@@ -82,79 +124,57 @@ pdfのurl：<input type="text" id="input-pdf" name="pdfurl" value="">
       info: ''
     },
     draw: function(){
-      AuthUI.elAuthBtn.textContent = AuthUI.data.authed ? 'LOGOUT' : 'LOGIN';
-      AuthUI.elUserId.textContent = AuthUI.data.userId;
+      //これでログインしているかどうかを確認できる。
+      firebase.auth().onAuthStateChanged(function(user) {
+        if (user && user.displayName != null) {
+          $("#message").show();
+          $("#input-message").show();
+          $("#btn-submit").show();
+          AuthUI.elAuthBtn.textContent = "LOGOUT";
+          alert(user.displayName);
+          AuthUI.elUserId.textContent = user.displayName;
+          // User is signed in.
+        } else {
+          $("#message").hide();
+          $("#input-message").hide();
+          $("#btn-submit").hide();
+          AuthUI.elAuthBtn.textContent = "LOGIN";
+          AuthUI.elUserId.textContent = "";
+          // No user is signed in.
+        }
+      });
+
     },
     doAuth: function(){
-      if(AuthUI.data.authed){
+      user = firebase.auth().currentUser;
+      if (user) {
         firebase.auth().signOut().then(function() {
           AuthUI.data.authed = false;
           AuthUI.data.userId = '';
           AuthUI.draw();
-        }, function(error) {
+          // Sign-out successful.
+        }).catch(function(error) {
           // An error happened.
         });
-      }
-      else {
+        // User is signed in.
+      } else {
         firebase.auth().signInWithRedirect(AuthUI.provider);
+        // No user is signed in.
       }
-    }
+
+    },
   };
 
   AuthUI.init();
+
+
 
   $(document).ready(function () {
 
     //ユーザ情報の変数
     var __User = {};
 
-    /*
-    var provider = new firebase.auth.GoogleAuthProvider();
-
-    firebase.auth().getRedirectResult().then(function(result) {
-      if (result.credential) {
-        // This gives you a Google Access Token. You can use it to access the Google API.
-        var token = result.credential.accessToken;
-        // ...
-      }
-      // The signed-in user info.
-      var user = result.user;
-    }).catch(function(error) {
-      // Handle Errors here.
-      var errorCode = error.code;
-      var errorMessage = error.message;
-      // The email of the user's account used.
-      var email = error.email;
-      // The firebase.auth.AuthCredential type that was used.
-      var credential = error.credential;
-      // ...
-    });
-    */
-    /*
-
-    //匿名でユーザ認証を行う
-    firebase.auth().signInAnonymously().catch(function (error) {
-        var errorCode = error.code;
-        var errorMessage = error.message;
-    });
-
-    */
-
-    /*
-    //ユーザ情報を取得する
-    firebase.auth().onAuthStateChanged(function (user) {
-        if (user) { //User情報が取得できた場合
-            __User.isAnonymous = user.isAnonymous;
-            __User.uid = user.uid;
-
-        } else { //ログアウト時
-
-        }
-    });
-    */
-
     var input_message = $("#input-message");
-    var input_pdf = $("#input-pdf");
     var btn_submit = $("#btn-submit");
 
 
@@ -162,12 +182,10 @@ pdfのurl：<input type="text" id="input-pdf" name="pdfurl" value="">
     btn_submit.on("click", function () {
       //テキストボックスに入力されているデータを取得
       var message_data = input_message.val();
-      var pdfurl_data = input_pdf.val();
-      sendname = message_data;
 
       //入力されているデータがある場合送る
-      if (message_data.length > 0 && pdfurl_data.length > 0) {
-          sendMessage(__User.uid, message_data, pdfurl_data);
+      if (message_data.length > 0) {
+          sendMessage(firebase.auth().currentUser.email, message_data);
       }
       else{
         alert("input is not written!");
@@ -176,37 +194,32 @@ pdfのurl：<input type="text" id="input-pdf" name="pdfurl" value="">
     });
 
 
-    function sendMessage(userid, message, pdfurl) {
+    function sendMessage(userid, message) {
 
-        if(AuthUI.data.userId == ""){
-          alert("Please Login!");
+        if(!flag){
+          alert("You are not master");
           return;
         }
 
-        var roomname = sendname;
+        user = firebase.auth().currentUser;
+        userid = user.email;
 
-        first_message = "HelloWorld";
-
-        userid = AuthUI.data.userId;
+        message += "@gmail.com";
 
         //送りたいデータ
         var data = {
-            "userid": userid,//ユーザID
-            "message": first_message,//メッセージ
-            "name" : roomname,
-            "pdfurl" : pdfurl
+            //"userid": userid,//ユーザID
+            "message": message,//メッセージ
         };
 
         //新しいIDを取得します
         var newMessageKey = firebase.database().ref().child(sendname).push().key;
 
         //messagesにデータを保存します
-        return firebase.database().ref("/rooms/" + sendname + '/' + "information").update(data).then(
+        return firebase.database().ref("/rooms/" + sendname + "/AllowedAccounts/" + newMessageKey).update(data).then(
             //送信成功時の処理
             function () {
-                //ここでurlの通知
-                var urlmakename = sendname;
-                alert(baseurl + urlmakename);
+              alert("gook");
                 console.log("メッセージを送信しました。");
             },
             //送信失敗時の処理
@@ -217,6 +230,8 @@ pdfのurl：<input type="text" id="input-pdf" name="pdfurl" value="">
     }
   });
 
+
 </script>
+
 
 </html>
