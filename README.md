@@ -1,2 +1,1 @@
-# repezen.io
-ktkr.com
+# 練習用
